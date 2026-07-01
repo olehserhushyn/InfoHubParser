@@ -18,10 +18,10 @@ A lightweight, reliable, and production-ready .NET 10 console application design
 The bot automatically maps feed categories to corresponding Discord Webhook environment variables:
 
 | Category | Description | Primary Env / Secrets Checked |
-|---|---|---|---|
-| **Daily Digests** | Tech digests and daily newsletters (Hacker News, TLDR, morning brews) | `DISCORD_WEBHOOK_DAILY_DIGESTS` <br> `discrod_webhook_daily-digests` |
-| **.NET Deep Dive** | C# and .NET deep-dives (Andrew Lock, Docker, etc.) | `DISCORD_WEBHOOK_CSHARP_DOTNET` <br> `discrod_webhook_csharp-dotnet` |
-| **Architecture** | System architecture and scale blogs (Netflix TechBlog, Uber, Cloudflare, etc.) | `DISCORD_WEBHOOK_ARCHITECTURE_SYSTEMS` <br> `discrod_webhook_architecture-systems` | 
+|---|---|---|
+| **Daily Digests** | Tech digests and daily newsletters (Hacker News, TLDR, morning brews) | `DISCORD_WEBHOOK_DAILY_DIGESTS`<br>`discord_webhook_daily-digests` |
+| **.NET Deep Dive** | C# and .NET deep-dives (Andrew Lock, Docker, etc.) | `DISCORD_WEBHOOK_CSHARP_DOTNET`<br>`discord_webhook_csharp-dotnet` |
+| **Architecture** | System architecture and scale blogs (Netflix TechBlog, Uber, Cloudflare, etc.) | `DISCORD_WEBHOOK_ARCHITECTURE_SYSTEMS`<br>`discord_webhook_architecture-systems` |
 
 ---
 
