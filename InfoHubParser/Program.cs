@@ -45,7 +45,8 @@ class Program
                 {
                     new FeedSource("Chris Alcock Morning Brew", "https://blog.cwa.me.uk/feed/"),
                     new FeedSource("Hacker News", "https://hnrss.org/frontpage"),
-                    new FeedSource("TLDR", "https://tldr.tech/rss")
+                    new FeedSource("TLDR", "https://tldr.tech/rss"),
+                    new FeedSource("Dan Luu Blog", "https://danluu.com/atom.xml")
                 }
             ),
             new CategoryConfig(
@@ -65,7 +66,9 @@ class Program
                     new FeedSource("Netflix TechBlog", "https://netflixtechblog.com/feed"),
                     new FeedSource("Uber", "https://www.uber.com/blog/engineering/rss"),
                     new FeedSource("Cloudflare", "https://blog.cloudflare.com/rss/"),
-                    new FeedSource("ByteByteGo", "https://blog.bytebytego.com/feed")
+                    new FeedSource("ByteByteGo", "https://blog.bytebytego.com/feed"),
+                    new FeedSource("Stripe Engineering Blog", "https://stripe.com/blog/engineering/rss"),
+                    new FeedSource("AWS Architecture Blog", "https://aws.amazon.com/blogs/architecture/feed/")
                 }
             )
         };
