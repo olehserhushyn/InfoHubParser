@@ -69,11 +69,11 @@ class Program
                 new List<FeedSource>
                 {
                     new FeedSource("Netflix TechBlog", "https://netflixtechblog.com/feed"),
-                    new FeedSource("Stripe Engineering", "https://stripe.com/blog/engineering/rss"),
+                    new FeedSource("Stripe Engineering", "https://github.com/stripe/stripe-dotnet/releases.atom"),
                     new FeedSource("Cloudflare", "https://blog.cloudflare.com/rss/"),
                     new FeedSource("ByteByteGo", "https://blog.bytebytego.com/feed"),
-                    new FeedSource("Uber Engineering", "https://www.uber.com/blog/engineering/rss"),
-                    new FeedSource("Shopify Engineering", "https://shopify.engineering/blog.atom")
+                    new FeedSource("Uber Engineering", "https://github.com/uber/h3/releases.atom"),
+                    new FeedSource("Shopify Engineering", "https://github.com/Shopify/flash-list/releases.atom")
                 }
             ),
 
@@ -85,7 +85,7 @@ class Program
                     new FeedSource("PostgreSQL", "https://www.postgresql.org/news.rss"),
                     new FeedSource("Brent Ozar", "https://www.brentozar.com/feed/"),
                     new FeedSource("SQLPerformance", "https://sqlperformance.com/feed"),
-                    new FeedSource("Use The Index, Luke", "https://use-the-index-luke.com/rss.xml")
+                    new FeedSource("Use The Index, Luke", "https://use-the-index-luke.com/blog/feed")
                 }
             ),
 
@@ -95,16 +95,16 @@ class Program
                 new List<FeedSource>
                 {
                     new FeedSource("AWS Architecture", "https://aws.amazon.com/blogs/architecture/feed/"),
-                    new FeedSource("Azure Architecture", "https://techcommunity.microsoft.com/t5/azure-architecture-blog/bg-p/AzureArchitectureBlog/rss"),
+                    new FeedSource("Azure Architecture", "https://azure.microsoft.com/en-us/blog/feed/"),
                     new FeedSource("Docker", "https://www.docker.com/blog/feed/"),
                     new FeedSource("Kubernetes", "https://kubernetes.io/feed.xml"),
-                    new FeedSource("OpenTelemetry", "https://opentelemetry.io/feed.xml")
+                    new FeedSource("OpenTelemetry", "https://github.com/open-telemetry/opentelemetry-specification/releases.atom")
                 }
             ),
 
             new CategoryConfig(
                 "Security",
-                new[] { "discrod_webhook_security", "DISCORD_WEBHOOK_SECURITY", "DISCROD_WEBHOOK_SECURITY", "DISCORD_WEBHOOK_F" },
+                new[] { "discrod_webhook_security", "DISCORD_WEBHOOK_SECURITY", "DISCORD_WEBHOOK_SECURITY", "DISCORD_WEBHOOK_F" },
                 new List<FeedSource>
                 {
                     new FeedSource("OWASP", "https://owasp.org/feed.xml"),
@@ -118,7 +118,7 @@ class Program
                 new[] { "discrod_webhook_ai-engineering", "DISCORD_WEBHOOK_AI_ENGINEERING", "DISCROD_WEBHOOK_AI_ENGINEERING", "DISCORD_WEBHOOK_G" },
                 new List<FeedSource>
                 {
-                    new FeedSource("Anthropic News", "https://www.anthropic.com/news/rss.xml"),
+                    new FeedSource("Anthropic News", "https://github.com/anthropics/anthropic-sdk-python/releases.atom"),
                     new FeedSource("OpenAI News", "https://openai.com/news/rss.xml"),
                     new FeedSource("Ollama", "https://ollama.com/blog/rss.xml")
                 }
@@ -130,7 +130,7 @@ class Program
                 new List<FeedSource>
                 {
                     new FeedSource("Farnam Street", "https://fs.blog/feed/"),
-                    new FeedSource("Works in Progress", "https://worksinprogress.co/feed"),
+                    new FeedSource("Works in Progress", "https://www.worksinprogress.news/feed"),
                     new FeedSource("Astral Codex Ten", "https://www.astralcodexten.com/feed")
                 }
             )
@@ -304,8 +304,11 @@ class Program
                 using var response = await httpClient.GetAsync(feedUrl);
                 response.EnsureSuccessStatusCode();
 
-                using var stream = await response.Content.ReadAsStreamAsync();
-                
+                string xmlContent = await response.Content.ReadAsStringAsync();
+
+                // Fix non-conformant Atom <author>plain text</author> tags (e.g., OWASP / Jekyll Atom feeds)
+                xmlContent = Regex.Replace(xmlContent, @"<author>\s*([^<]+?)\s*</author>", "<author><name>$1</name></author>");
+
                 var readerSettings = new XmlReaderSettings
                 {
                     DtdProcessing = DtdProcessing.Ignore,
@@ -313,7 +316,7 @@ class Program
                     IgnoreWhitespace = true
                 };
 
-                using var reader = XmlReader.Create(stream, readerSettings);
+                using var reader = XmlReader.Create(new StringReader(xmlContent), readerSettings);
                 var feed = SyndicationFeed.Load(reader);
 
                 return feed?.Items?.ToList() ?? new List<SyndicationItem>();

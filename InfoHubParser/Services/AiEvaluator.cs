@@ -66,7 +66,7 @@ public static class AiEvaluator
         {
             try
             {
-                var eval = await CallOpenAiCompatibleAsync(httpClient, "https://openrouter.ai/api/v1/chat/completions", openRouterKey.Trim(), "google/gemini-2.0-flash-lite-preview-02-05:free", prompt);
+                var eval = await CallOpenAiCompatibleAsync(httpClient, "https://openrouter.ai/api/v1/chat/completions", openRouterKey.Trim(), "meta-llama/llama-3.3-70b-instruct:free", prompt);
                 if (eval != null) return eval;
             }
             catch (Exception ex)
@@ -116,14 +116,15 @@ public static class AiEvaluator
             cooldownUntil = DateTime.UtcNow.AddMinutes(2);
             Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API rate-limited (429). Cooldown active for 2 minutes. Falling back to next evaluator...");
         }
-        else if (msg.Contains("404") || msg.Contains("Not Found") || msg.Contains("401") || msg.Contains("Unauthorized"))
+        else if (msg.Contains("400") || msg.Contains("Bad Request") || msg.Contains("404") || msg.Contains("Not Found") || msg.Contains("401") || msg.Contains("Unauthorized") || msg.Contains("403") || msg.Contains("Forbidden"))
         {
             cooldownUntil = DateTime.UtcNow.AddMinutes(15);
-            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API returned error ({msg}). Pausing {providerName} for this run. Falling back to next evaluator...");
+            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API returned client error ({msg}). Pausing {providerName} for 15 minutes. Falling back to next evaluator...");
         }
         else
         {
-            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API evaluation failed: {msg}. Falling back...");
+            cooldownUntil = DateTime.UtcNow.AddMinutes(2);
+            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API evaluation failed ({msg}). Pausing {providerName} for 2 minutes. Falling back to next evaluator...");
         }
     }
 
