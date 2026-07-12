@@ -306,9 +306,6 @@ class Program
 
                 string xmlContent = await response.Content.ReadAsStringAsync();
 
-                // Fix non-conformant Atom <author>plain text</author> tags (e.g., OWASP / Jekyll Atom feeds)
-                xmlContent = Regex.Replace(xmlContent, @"<author>\s*([^<]+?)\s*</author>", "<author><name>$1</name></author>");
-
                 var readerSettings = new XmlReaderSettings
                 {
                     DtdProcessing = DtdProcessing.Ignore,
@@ -316,10 +313,25 @@ class Program
                     IgnoreWhitespace = true
                 };
 
-                using var reader = XmlReader.Create(new StringReader(xmlContent), readerSettings);
-                var feed = SyndicationFeed.Load(reader);
-
-                return feed?.Items?.ToList() ?? new List<SyndicationItem>();
+                try
+                {
+                    using var reader = XmlReader.Create(new StringReader(xmlContent), readerSettings);
+                    var feed = SyndicationFeed.Load(reader);
+                    return feed?.Items?.ToList() ?? new List<SyndicationItem>();
+                }
+                catch (XmlException)
+                {
+                    // If initial parsing throws XmlException (e.g. non-conformant Atom <author>plain text</author> in Jekyll feeds like OWASP),
+                    // conditionally normalize Atom-specific author tags and retry parsing without breaking RSS 2.0 feeds like Auth0.
+                    if (xmlContent.Contains("<feed") || xmlContent.Contains("http://www.w3.org/2005/Atom"))
+                    {
+                        string sanitizedXml = Regex.Replace(xmlContent, @"<author>\s*([^<]+?)\s*</author>", "<author><name>$1</name></author>");
+                        using var sanitizedReader = XmlReader.Create(new StringReader(sanitizedXml), readerSettings);
+                        var sanitizedFeed = SyndicationFeed.Load(sanitizedReader);
+                        return sanitizedFeed?.Items?.ToList() ?? new List<SyndicationItem>();
+                    }
+                    throw;
+                }
             }
             catch (Exception ex) when (attempt <= maxRetries && (ex is HttpRequestException || ex is TaskCanceledException || ex is XmlException))
             {
