@@ -82,8 +82,8 @@ class Program
                 new[] { "discrod_webhook_databases", "DISCORD_WEBHOOK_DATABASES", "DISCROD_WEBHOOK_DATABASES", "DISCORD_WEBHOOK_D" },
                 new List<FeedSource>
                 {
-                    new FeedSource("PostgreSQL", "https://www.postgresql.org/feeds/news.rss"),
-                    new FeedSource("Brent Ozar", "https://www.brentozar.com/archive/feed/"),
+                    new FeedSource("PostgreSQL", "https://www.postgresql.org/news.rss"),
+                    new FeedSource("Brent Ozar", "https://www.brentozar.com/feed/"),
                     new FeedSource("SQLPerformance", "https://sqlperformance.com/feed"),
                     new FeedSource("Use The Index, Luke", "https://use-the-index-luke.com/rss.xml")
                 }
@@ -141,8 +141,9 @@ class Program
         {
             Timeout = TimeSpan.FromSeconds(30)
         };
-        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) RSS-to-Discord Bot");
-        httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/rss+xml, application/xml, text/xml, */*");
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0");
+        httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7");
+        httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
 
         int totalProcessed = 0;
         int totalSent = 0;
@@ -170,38 +171,72 @@ class Program
                         var items = await FetchFeedItemsWithRetryAsync(httpClient, feedSource.Url);
                         Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     Found {items.Count} items.");
 
-                        // Process items from oldest to newest to post in chronological order
-                        foreach (var item in items.AsEnumerable().Reverse())
+                        // 1. Identify all un-sent items for this feed
+                        var unSentItems = new List<(SyndicationItem Item, string Url, DateTimeOffset PubDate)>();
+                        foreach (var item in items)
                         {
                             string? articleUrl = item.Links.FirstOrDefault()?.Uri?.AbsoluteUri ?? item.Id;
-                            if (string.IsNullOrWhiteSpace(articleUrl))
-                            {
-                                continue;
-                            }
-
+                            if (string.IsNullOrWhiteSpace(articleUrl)) continue;
                             articleUrl = articleUrl.Trim();
-                            totalProcessed++;
 
-                            // Check if already sent
                             bool alreadySent = await CheckIfSentAsync(connectionString, articleUrl);
-                            if (alreadySent)
+                            if (!alreadySent)
                             {
-                                continue;
+                                DateTimeOffset pubDate = item.PublishDate != default ? item.PublishDate : (item.LastUpdatedTime != default ? item.LastUpdatedTime : DateTimeOffset.UtcNow);
+                                unSentItems.Add((item, articleUrl, pubDate));
                             }
+                        }
 
-                            // Send to Discord
-                            string titleToLog = item.Title?.Text ?? articleUrl;
+                        if (unSentItems.Count == 0) continue;
+
+                        // 2. Filter out historical items older than 14 days so we never flood old archive posts into Discord/AI
+                        var recentUnSent = new List<(SyndicationItem Item, string Url, DateTimeOffset PubDate)>();
+                        foreach (var entry in unSentItems)
+                        {
+                            if (DateTimeOffset.UtcNow - entry.PubDate > TimeSpan.FromDays(14))
+                            {
+                                // Silently mark historical items (>14 days old) as processed in SQLite
+                                await SaveSentArticleAsync(connectionString, entry.Url);
+                                totalProcessed++;
+                            }
+                            else
+                            {
+                                recentUnSent.Add(entry);
+                            }
+                        }
+
+                        // 3. Cap max new items sent per feed per sync run to 3 to prevent burst notifications / AI 429 errors
+                        int maxItemsPerFeed = 3;
+                        var itemsToSend = recentUnSent
+                            .OrderByDescending(x => x.PubDate)
+                            .Take(maxItemsPerFeed)
+                            .OrderBy(x => x.PubDate) // Order oldest to newest among top 3 for chronological posting
+                            .ToList();
+
+                        // Any recent items beyond the top 3 (e.g. initial feed addition of 15 recent posts) are marked as processed to prevent backlog flooding
+                        if (recentUnSent.Count > maxItemsPerFeed)
+                        {
+                            var skippedRecent = recentUnSent.OrderByDescending(x => x.PubDate).Skip(maxItemsPerFeed);
+                            foreach (var skipped in skippedRecent)
+                            {
+                                await SaveSentArticleAsync(connectionString, skipped.Url);
+                                totalProcessed++;
+                            }
+                            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [INFO] Feed has {recentUnSent.Count} recent un-sent items. Sending top {maxItemsPerFeed} and marking {recentUnSent.Count - maxItemsPerFeed} as processed to prevent spam.");
+                        }
+
+                        foreach (var entry in itemsToSend)
+                        {
+                            totalProcessed++;
+                            string titleToLog = entry.Item.Title?.Text ?? entry.Url;
                             Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     Syncing: {titleToLog}");
-                            bool sentSuccessfully = await SendToDiscordWithRetryAsync(httpClient, webhookUrl, category.CategoryName, feedSource.Name, item);
+                            bool sentSuccessfully = await SendToDiscordWithRetryAsync(httpClient, webhookUrl, category.CategoryName, feedSource.Name, entry.Item);
 
                             if (sentSuccessfully)
                             {
-                                // Save to SQLite
-                                await SaveSentArticleAsync(connectionString, articleUrl);
+                                await SaveSentArticleAsync(connectionString, entry.Url);
                                 totalSent++;
-
-                                // Polite delay to respect Discord rate limits
-                                await Task.Delay(1000);
+                                await Task.Delay(2500); // Polite 2.5s delay between articles to respect Discord & AI rate limits
                             }
                             else
                             {

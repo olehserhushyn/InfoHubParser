@@ -12,6 +12,11 @@ public static class AiEvaluator
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    private static DateTime _geminiCooldownUntil = DateTime.MinValue;
+    private static DateTime _groqCooldownUntil = DateTime.MinValue;
+    private static DateTime _openRouterCooldownUntil = DateTime.MinValue;
+    private static DateTime _openAiCooldownUntil = DateTime.MinValue;
+
     public static async Task<ArticleEvaluation> EvaluateArticleAsync(
         HttpClient httpClient,
         string title,
@@ -29,7 +34,7 @@ public static class AiEvaluator
         string prompt = BuildPrompt(title, description, url, categoryName, sourceName);
 
         // 1. Try Google Gemini API (Free tier from Google AI Studio)
-        if (!string.IsNullOrWhiteSpace(geminiKey))
+        if (!string.IsNullOrWhiteSpace(geminiKey) && DateTime.UtcNow >= _geminiCooldownUntil)
         {
             try
             {
@@ -38,12 +43,12 @@ public static class AiEvaluator
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] Gemini API evaluation failed: {ex.Message}. Falling back...");
+                HandleApiFailure("Gemini", ex, ref _geminiCooldownUntil);
             }
         }
 
         // 2. Try Groq API (Free tier)
-        if (!string.IsNullOrWhiteSpace(groqKey))
+        if (!string.IsNullOrWhiteSpace(groqKey) && DateTime.UtcNow >= _groqCooldownUntil)
         {
             try
             {
@@ -52,26 +57,26 @@ public static class AiEvaluator
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] Groq API evaluation failed: {ex.Message}. Falling back...");
+                HandleApiFailure("Groq", ex, ref _groqCooldownUntil);
             }
         }
 
         // 3. Try OpenRouter API (Free tier models)
-        if (!string.IsNullOrWhiteSpace(openRouterKey))
+        if (!string.IsNullOrWhiteSpace(openRouterKey) && DateTime.UtcNow >= _openRouterCooldownUntil)
         {
             try
             {
-                var eval = await CallOpenAiCompatibleAsync(httpClient, "https://openrouter.ai/api/v1/chat/completions", openRouterKey.Trim(), "google/gemini-2.0-flash-exp:free", prompt);
+                var eval = await CallOpenAiCompatibleAsync(httpClient, "https://openrouter.ai/api/v1/chat/completions", openRouterKey.Trim(), "google/gemini-2.0-flash-lite-preview-02-05:free", prompt);
                 if (eval != null) return eval;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] OpenRouter API evaluation failed: {ex.Message}. Falling back...");
+                HandleApiFailure("OpenRouter", ex, ref _openRouterCooldownUntil);
             }
         }
 
         // 4. Try OpenAI API
-        if (!string.IsNullOrWhiteSpace(openAiKey))
+        if (!string.IsNullOrWhiteSpace(openAiKey) && DateTime.UtcNow >= _openAiCooldownUntil)
         {
             try
             {
@@ -80,7 +85,7 @@ public static class AiEvaluator
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] OpenAI API evaluation failed: {ex.Message}. Falling back...");
+                HandleApiFailure("OpenAI", ex, ref _openAiCooldownUntil);
             }
         }
 
@@ -101,6 +106,25 @@ public static class AiEvaluator
 
         // 6. Intelligent local heuristic evaluation (ensures free AI evaluation works out of the box or as fallback)
         return EvaluateLocallyHeuristic(title, description, categoryName);
+    }
+
+    private static void HandleApiFailure(string providerName, Exception ex, ref DateTime cooldownUntil)
+    {
+        string msg = ex.Message;
+        if (msg.Contains("429") || msg.Contains("Too Many Requests"))
+        {
+            cooldownUntil = DateTime.UtcNow.AddMinutes(2);
+            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API rate-limited (429). Cooldown active for 2 minutes. Falling back to next evaluator...");
+        }
+        else if (msg.Contains("404") || msg.Contains("Not Found") || msg.Contains("401") || msg.Contains("Unauthorized"))
+        {
+            cooldownUntil = DateTime.UtcNow.AddMinutes(15);
+            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API returned error ({msg}). Pausing {providerName} for this run. Falling back to next evaluator...");
+        }
+        else
+        {
+            Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [WARNING] {providerName} API evaluation failed: {msg}. Falling back...");
+        }
     }
 
     private static string BuildPrompt(string title, string? description, string url, string categoryName, string sourceName)
