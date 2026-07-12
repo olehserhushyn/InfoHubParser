@@ -6,6 +6,7 @@ using System.Xml;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using InfoHubParser.Models;
+using InfoHubParser.Services;
 
 namespace InfoHubParser;
 
@@ -43,32 +44,94 @@ class Program
                 new[] { "discrod_webhook_daily-digests", "DISCORD_WEBHOOK_DAILY_DIGESTS", "DISCROD_WEBHOOK_DAILY_DIGESTS", "DISCORD_WEBHOOK_A" },
                 new List<FeedSource>
                 {
-                    new FeedSource("Chris Alcock Morning Brew", "https://blog.cwa.me.uk/feed/"),
                     new FeedSource("Hacker News", "https://hnrss.org/frontpage"),
                     new FeedSource("TLDR", "https://tldr.tech/rss"),
-                    new FeedSource("Dan Luu Blog", "https://danluu.com/atom.xml")
+                    new FeedSource("Dan Luu", "https://danluu.com/atom.xml"),
+                    new FeedSource("Simon Willison", "https://simonwillison.net/atom/everything/"),
+                    new FeedSource("Martin Fowler", "https://martinfowler.com/feed.atom")
                 }
             ),
+
             new CategoryConfig(
-                ".NET Deep Dive",
+                ".NET & Backend",
                 new[] { "discrod_webhook_csharp-dotnet", "DISCORD_WEBHOOK_CSHARP_DOTNET", "DISCROD_WEBHOOK_CSHARP_DOTNET", "DISCORD_WEBHOOK_B" },
                 new List<FeedSource>
                 {
                     new FeedSource("Andrew Lock", "https://andrewlock.net/rss.xml"),
-                    new FeedSource("Docker", "https://www.docker.com/blog/feed/")
+                    new FeedSource(".NET Blog", "https://devblogs.microsoft.com/dotnet/feed/"),
+                    new FeedSource("Steve Gordon", "https://www.stevejgordon.co.uk/feed")
                 }
             ),
+
             new CategoryConfig(
-                "Architecture",
+                "Architecture & Distributed Systems",
                 new[] { "discrod_webhook_architecture-systems", "DISCORD_WEBHOOK_ARCHITECTURE_SYSTEMS", "DISCROD_WEBHOOK_ARCHITECTURE_SYSTEMS", "DISCORD_WEBHOOK_C" },
                 new List<FeedSource>
                 {
                     new FeedSource("Netflix TechBlog", "https://netflixtechblog.com/feed"),
-                    new FeedSource("Uber", "https://www.uber.com/blog/engineering/rss"),
+                    new FeedSource("Stripe Engineering", "https://stripe.com/blog/engineering/rss"),
                     new FeedSource("Cloudflare", "https://blog.cloudflare.com/rss/"),
                     new FeedSource("ByteByteGo", "https://blog.bytebytego.com/feed"),
-                    new FeedSource("Stripe Engineering Blog", "https://stripe.com/blog/engineering/rss"),
-                    new FeedSource("AWS Architecture Blog", "https://aws.amazon.com/blogs/architecture/feed/")
+                    new FeedSource("Uber Engineering", "https://www.uber.com/blog/engineering/rss"),
+                    new FeedSource("Shopify Engineering", "https://shopify.engineering/blog.atom")
+                }
+            ),
+
+            new CategoryConfig(
+                "Databases & Data",
+                new[] { "discrod_webhook_databases", "DISCORD_WEBHOOK_DATABASES", "DISCROD_WEBHOOK_DATABASES", "DISCORD_WEBHOOK_D" },
+                new List<FeedSource>
+                {
+                    new FeedSource("PostgreSQL", "https://www.postgresql.org/feeds/news.rss"),
+                    new FeedSource("Brent Ozar", "https://www.brentozar.com/archive/feed/"),
+                    new FeedSource("SQLPerformance", "https://sqlperformance.com/feed"),
+                    new FeedSource("Use The Index, Luke", "https://use-the-index-luke.com/rss.xml")
+                }
+            ),
+
+            new CategoryConfig(
+                "Cloud & Platform",
+                new[] { "discrod_webhook_cloud-platform", "DISCORD_WEBHOOK_CLOUD_PLATFORM", "DISCROD_WEBHOOK_CLOUD_PLATFORM", "DISCORD_WEBHOOK_E" },
+                new List<FeedSource>
+                {
+                    new FeedSource("AWS Architecture", "https://aws.amazon.com/blogs/architecture/feed/"),
+                    new FeedSource("Azure Architecture", "https://techcommunity.microsoft.com/t5/azure-architecture-blog/bg-p/AzureArchitectureBlog/rss"),
+                    new FeedSource("Docker", "https://www.docker.com/blog/feed/"),
+                    new FeedSource("Kubernetes", "https://kubernetes.io/feed.xml"),
+                    new FeedSource("OpenTelemetry", "https://opentelemetry.io/feed.xml")
+                }
+            ),
+
+            new CategoryConfig(
+                "Security",
+                new[] { "discrod_webhook_security", "DISCORD_WEBHOOK_SECURITY", "DISCROD_WEBHOOK_SECURITY", "DISCORD_WEBHOOK_F" },
+                new List<FeedSource>
+                {
+                    new FeedSource("OWASP", "https://owasp.org/feed.xml"),
+                    new FeedSource("Trail of Bits", "https://blog.trailofbits.com/feed/"),
+                    new FeedSource("Auth0", "https://auth0.com/blog/rss.xml")
+                }
+            ),
+
+            new CategoryConfig(
+                "AI Engineering",
+                new[] { "discrod_webhook_ai-engineering", "DISCORD_WEBHOOK_AI_ENGINEERING", "DISCROD_WEBHOOK_AI_ENGINEERING", "DISCORD_WEBHOOK_G" },
+                new List<FeedSource>
+                {
+                    new FeedSource("Anthropic News", "https://www.anthropic.com/news/rss.xml"),
+                    new FeedSource("OpenAI News", "https://openai.com/news/rss.xml"),
+                    new FeedSource("Ollama", "https://ollama.com/blog/rss.xml")
+                }
+            ),
+
+            new CategoryConfig(
+                "Human Systems",
+                new[] { "discrod_webhook_human-systems", "DISCORD_WEBHOOK_HUMAN_SYSTEMS", "DISCROD_WEBHOOK_HUMAN_SYSTEMS", "DISCORD_WEBHOOK_H" },
+                new List<FeedSource>
+                {
+                    new FeedSource("Farnam Street", "https://fs.blog/feed/"),
+                    new FeedSource("Works in Progress", "https://worksinprogress.co/feed"),
+                    new FeedSource("Astral Codex Ten", "https://www.astralcodexten.com/feed")
                 }
             )
         };
@@ -282,12 +345,28 @@ class Program
             }
         }
 
+        // Perform AI evaluation for exact scores and read time
+        var aiEval = await AiEvaluator.EvaluateArticleAsync(
+            httpClient,
+            title,
+            description,
+            url ?? title,
+            categoryName,
+            sourceName);
+
+        Console.WriteLine($"[{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]     [AI Eval] Importance: {aiEval.Importance}/10 | Career ROI: {aiEval.CareerRoi}/10 | Timelessness: {aiEval.Timelessness}/10 | Read Time: {aiEval.ReadTime}");
+
         // Distinct colors for each category
         int color = categoryName switch
         {
             "Daily Digests" => 0x3498DB, // Blue
-            ".NET Deep Dive" => 0x9B59B6, // Purple
-            "Architecture" => 0xE67E22, // Orange
+            ".NET & Backend" => 0x9B59B6, // Purple
+            "Architecture & Distributed Systems" => 0xE67E22, // Orange
+            "Databases & Data" => 0x2ECC71, // Green
+            "Cloud & Platform" => 0x1ABC9C, // Teal
+            "Security" => 0xE74C3C, // Red
+            "AI Engineering" => 0xF1C40F, // Gold
+            "Human Systems" => 0xE6B0AA, // Rose/Soft Pink
             _ => 0x5865F2 // Discord Blurple
         };
 
@@ -306,6 +385,13 @@ class Program
                     Footer = new DiscordFooter
                     {
                         Text = $"{sourceName} • {categoryName}"
+                    },
+                    Fields = new List<DiscordField>
+                    {
+                        new DiscordField { Name = "Importance", Value = $"{aiEval.Importance}/10", Inline = true },
+                        new DiscordField { Name = "Career ROI", Value = $"{aiEval.CareerRoi}/10", Inline = true },
+                        new DiscordField { Name = "Timelessness", Value = $"{aiEval.Timelessness}/10", Inline = true },
+                        new DiscordField { Name = "Read Time", Value = aiEval.ReadTime, Inline = true }
                     }
                 }
             }

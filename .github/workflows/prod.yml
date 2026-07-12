@@ -2,7 +2,7 @@ name: RSS to Discord Sync
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */8 * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +26,15 @@ jobs:
           DISCORD_WEBHOOK_DAILY_DIGESTS: ${{ secrets.DISCORD_WEBHOOK_DAILY_DIGESTS }}
           DISCORD_WEBHOOK_CSHARP_DOTNET: ${{ secrets.DISCORD_WEBHOOK_CSHARP_DOTNET }}
           DISCORD_WEBHOOK_ARCHITECTURE_SYSTEMS: ${{ secrets.DISCORD_WEBHOOK_ARCHITECTURE_SYSTEMS }}
+          DISCORD_WEBHOOK_DATABASES: ${{ secrets.DISCORD_WEBHOOK_DATABASES }}
+          DISCORD_WEBHOOK_CLOUD_PLATFORM: ${{ secrets.DISCORD_WEBHOOK_CLOUD_PLATFORM }}
+          DISCORD_WEBHOOK_SECURITY: ${{ secrets.DISCORD_WEBHOOK_SECURITY }}
+          DISCORD_WEBHOOK_AI_ENGINEERING: ${{ secrets.DISCORD_WEBHOOK_AI_ENGINEERING }}
+          DISCORD_WEBHOOK_HUMAN_SYSTEMS: ${{ secrets.DISCORD_WEBHOOK_HUMAN_SYSTEMS }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DATABASE_PATH: news.db
         run: dotnet run --project InfoHubParser/InfoHubParser.csproj
 

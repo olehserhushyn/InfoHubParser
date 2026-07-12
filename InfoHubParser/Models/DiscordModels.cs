@@ -36,6 +36,9 @@ public class DiscordEmbed
 
     [JsonPropertyName("footer")]
     public DiscordFooter? Footer { get; set; }
+
+    [JsonPropertyName("fields")]
+    public List<DiscordField>? Fields { get; set; }
 }
 
 public class DiscordFooter
@@ -46,3 +49,16 @@ public class DiscordFooter
     [JsonPropertyName("icon_url")]
     public string? IconUrl { get; set; }
 }
+
+public class DiscordField
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "";
+
+    [JsonPropertyName("value")]
+    public string Value { get; set; } = "";
+
+    [JsonPropertyName("inline")]
+    public bool Inline { get; set; } = true;
+}
+
